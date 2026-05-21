@@ -36,21 +36,27 @@ pi-reflect: Memory updated · Skill "bar" patched
 
 ## Install
 
-pi-reflect is a global extension. Symlink it into pi's user extension
-directory:
+pi-reflect is a global extension. Symlink the extension **directory** (not
+just `index.ts`) into pi's user extension directory:
 
 ```bash
-git clone https://github.com/<you>/pi-reflect-ext.git ~/path/to/pi-reflect-ext
+git clone https://github.com/briggsd/pi-reflect-ext.git ~/path/to/pi-reflect-ext
 mkdir -p ~/.pi/agent/extensions
-ln -s ~/path/to/pi-reflect-ext/index.ts ~/.pi/agent/extensions/pi-reflect.ts
+ln -s ~/path/to/pi-reflect-ext ~/.pi/agent/extensions/pi-reflect
 ```
+
+Pi reads `package.json` from the linked directory, finds the `pi.extensions`
+entry, and loads `index.ts`. Relative imports between the extension's own
+files (e.g., `./audit.ts`) resolve correctly because pi treats the linked
+directory as the extension's package root. A single-file symlink to
+`index.ts` will *not* work — relative imports break.
 
 Pi will auto-discover the extension on every session, in every project.
 
 To uninstall, just remove the symlink:
 
 ```bash
-rm ~/.pi/agent/extensions/pi-reflect.ts
+rm ~/.pi/agent/extensions/pi-reflect
 ```
 
 Optionally `npm install` inside the repo to get full IDE intellisense
