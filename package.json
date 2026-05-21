@@ -1,0 +1,24 @@
+{
+	"name": "pi-reflect",
+	"description": "Self-improvement reviewer extension for pi: persists user preferences and reusable skills after each turn or agent run.",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"clean": "echo 'nothing to clean'",
+		"build": "echo 'nothing to build'",
+		"check": "echo 'nothing to check'"
+	},
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"devDependencies": {
+		"@earendil-works/pi-agent-core": "^0.75.4",
+		"@earendil-works/pi-ai": "^0.75.4",
+		"@earendil-works/pi-coding-agent": "^0.75.4",
+		"@earendil-works/pi-tui": "^0.75.4",
+		"typebox": "^1.1.24"
+	}
+}
