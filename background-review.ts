@@ -20,6 +20,7 @@ import { isSkillProtected, type ProtectedSkillsConfig } from "./protected.ts";
 import { getSkillsRoot, resolveSkillFile } from "./safe-path.ts";
 import { type EditRecord, summarizeEdits } from "./summarize.ts";
 import { memoryTool } from "./tools/memory.ts";
+import { piJournalTool } from "./tools/pi-journal.ts";
 import { createSkillManageTool } from "./tools/skill-manage.ts";
 import { vaultDailyTool } from "./tools/vault-daily.ts";
 import { vaultPendingTool } from "./tools/vault-pending.ts";
@@ -66,6 +67,7 @@ export async function runBackgroundReview(
 	const systemPrompt = ctx.getSystemPrompt();
 	const tools: AgentTool[] = [
 		toAgentTool(memoryTool, ctx),
+		toAgentTool(piJournalTool, ctx),
 		toAgentTool(createSkillManageTool(() => protectedConfig), ctx),
 		toAgentTool(vaultPendingTool, ctx),
 		toAgentTool(vaultDailyTool, ctx),
