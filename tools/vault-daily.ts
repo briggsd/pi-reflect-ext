@@ -131,6 +131,14 @@ export const vaultDailyTool = defineTool({
 		const dailyDir = getVaultDailyDir();
 		const target = path.join(dailyDir, `${dateStr}.md`);
 
+		// Skip gracefully if vault Daily directory doesn't exist
+		if (!fs.existsSync(dailyDir)) {
+			return {
+				content: [{ type: "text", text: `vault_daily: skipped — vault Daily dir not found at ${dailyDir}` }],
+				details: { date: dateStr, created: false, bytesBefore: 0, bytesAfter: 0 } as VaultDailyDetails,
+			};
+		}
+
 		try {
 			confinePathTo(getVaultRoot(), target);
 		} catch (e) {

@@ -13,6 +13,16 @@ function isSkillManageDetails(value: unknown): value is SkillManageDetails {
 	return typeof value === "object" && value !== null;
 }
 
+interface PiJournalDetails {
+	date?: string;
+	file?: string;
+	created?: boolean;
+}
+
+function isPiJournalDetails(value: unknown): value is PiJournalDetails {
+	return typeof value === "object" && value !== null;
+}
+
 interface VaultDailyDetails {
 	date?: string;
 	created?: boolean;
@@ -44,6 +54,7 @@ export function summarizeEdits(edits: EditRecord[]): string | null {
 	const seen = new Set<string>();
 	const parts: string[] = [];
 	let memoryReported = false;
+	let journalReported = false;
 	let dailyReported = false;
 	let pendingCount = 0;
 	let sourceCount = 0;
@@ -65,6 +76,14 @@ export function summarizeEdits(edits: EditRecord[]): string | null {
 			const skill = edit.details.skill;
 			if ((action === "write" || action === "write_file") && typeof skill === "string" && skill.length > 0) {
 				parts.push(`Skill "${skill}" patched`);
+			}
+			continue;
+		}
+
+		if (edit.toolName === "pi_journal" && isPiJournalDetails(edit.details)) {
+			if (!journalReported) {
+				parts.push("Session logged");
+				journalReported = true;
 			}
 			continue;
 		}

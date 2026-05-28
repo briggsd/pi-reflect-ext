@@ -8,6 +8,7 @@ import { invalidateSettingsCache, isReflectMode, loadSettings, overrideMode, typ
 import { formatStatus, invalidateStateCache, loadState, type RunSummary, recordRun, recordTurn } from "./state.ts";
 import { memoryTool } from "./tools/memory.ts";
 import { createSkillManageTool } from "./tools/skill-manage.ts";
+import { piJournalTool } from "./tools/pi-journal.ts";
 import { vaultDailyTool } from "./tools/vault-daily.ts";
 import { vaultPendingTool } from "./tools/vault-pending.ts";
 import { vaultSourceTool } from "./tools/vault-source.ts";
@@ -136,6 +137,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 	pi.registerTool(memoryTool);
 	pi.registerTool(createSkillManageTool(() => protectedConfig));
 	pi.registerTool(vaultPendingTool);
+	pi.registerTool(piJournalTool);
 	pi.registerTool(vaultDailyTool);
 	pi.registerTool(vaultSourceTool);
 

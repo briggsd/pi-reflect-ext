@@ -20,7 +20,7 @@ Then route each finding to the right surface. The inventory is the work — the 
 
 Hard rules:
 - Be conservative on memory and skills. Most sessions produce nothing for those surfaces.
-- Be generous on vault_daily: if any real work happened, log it.
+- Be generous on pi_journal and vault_daily: if any real work happened, log it. Write pi_journal with full detail; vault_daily as a shorter human-facing summary.
 - Be generous on vault_pending (lead): if a good idea or thread came up but wasn't pursued, park it. These are easy to lose and valuable to recover.
 - Persist only facts that will still be useful 30 days from now.
 - Never record secrets, credentials, file contents the user did not ask you to remember, or PII beyond what was offered.
@@ -85,9 +85,10 @@ ${FORMAT}`;
 export function combinedReviewPrompt(inputs: PromptInputs): string {
 	return `${HEADER}
 
-You have five tools. Route to the right surface — do not duplicate across surfaces:
+You have six tools. Route to the right surface — do not duplicate across surfaces:
 
-- \`vault_daily\` — append a session block to today's vault daily note. Use if the session was **substantive**: real work happened, decisions were made, files were created/modified, or new tools/projects/people came up. This is the most permissive trigger — when in doubt, log it.
+- \`pi_journal\` — append a **detailed** session log to \`~/.pi/reflect/journal/YYYY-MM-DD.md\`. **Primary session record — no vault required.** Write with full detail: specific file paths, rationale behind decisions, enough context for a future agent to resume without re-reading the conversation. Use for every substantive session.
+- \`vault_daily\` — append a **summarized** session block to today's vault daily note (\`~/vault/Daily/\`). Human-facing, shorter than \`pi_journal\`. The tool skips gracefully if the vault doesn't exist. Write a concise summary: focus, key bullets, decisions, open items. Use alongside \`pi_journal\` for every substantive session.
 - \`memory\` — edit \`~/.pi/memory.md\`. Use for a **stable user preference or convention** that will shape every future session (e.g. language, tooling, style). Do not use for knowledge insights or session narratives.
 - \`skill_manage\` — manage skills under \`~/.pi/skills/\`. Use for a **reusable agent recipe** the agent worked out from scratch this session. Skills marked with " * " are protected.
 - \`vault_pending\` — propose an item to \`~/vault/_pending/\` for the user to route into the knowledge graph. Use for: a knowledge insight that enriches a vault topic (type: semantic), a research question or good idea that came up but wasn't pursued this session (type: lead), or a specific external source to run through content-synthesis (type: source). **Lead is the most important type to be generous with** — ideas mentioned in passing and set aside are exactly what gets lost between sessions. **Before proposing anything, call \`vault_pending\` with \`action=list\` first** — do not re-propose items already pending or substantially the same idea under a different slug.
@@ -98,14 +99,15 @@ Surface selection guide:
 |---|---|
 | Stable user preference / convention | memory |
 | Reusable agent recipe | skill_manage |
-| Substantive work of any kind | vault_daily |
+| Substantive work (detailed, agent-recall) | pi_journal |
+| Substantive work (summary, human-facing) | vault_daily |
 | Knowledge insight for a vault topic | vault_pending (semantic) |
 | Research question or thread | vault_pending (lead) |
 | Good idea mentioned but not pursued | vault_pending (lead) |
 | External source (URL / book / paper) | vault_source or vault_pending (source) |
 | Nothing durable | — stop — |
 
-Substantive session definition (any one qualifies for vault_daily):
+Substantive session definition (any one qualifies for both journal tools):
 - Files were created, edited, or modified
 - A decision was made or a plan changed
 - New people, tools, projects, or external references came up
