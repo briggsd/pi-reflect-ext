@@ -96,7 +96,7 @@ override):
 |---|---|
 | `off` | Never. |
 | `session` | After `agent_end` — once per user-initiated agent run. **Default.** |
-| `turn` | After every `turn_end` — useful for development; noisier. |
+| `turn` | Every `turnInterval` turns (default 5), plus after `agent_end` as a backstop. |
 
 ## Commands
 
@@ -144,6 +144,7 @@ Protected skills cannot be overwritten. See "Protecting skills" below.
 {
   "pi-reflect": {
     "mode": "session",
+    "turnInterval": 5,
     "protectedSkills": ["create-skill", "review"]
   }
 }
@@ -152,6 +153,7 @@ Protected skills cannot be overwritten. See "Protecting skills" below.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `mode` | `"off"` \| `"session"` \| `"turn"` | `"session"` | Reviewer trigger. |
+| `turnInterval` | `number` | `5` | In `turn` mode, how many turns to accumulate before firing a review. Must be a positive integer. |
 | `protectedSkills` | `string[]` | `[]` | Skill names the reviewer (and any agent) cannot overwrite. |
 
 Settings are read at every `session_start`. Edit the file and restart pi to

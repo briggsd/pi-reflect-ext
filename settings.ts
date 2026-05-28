@@ -13,11 +13,13 @@ export function isReflectMode(value: unknown): value is ReflectMode {
 export interface ReflectSettings {
 	mode: ReflectMode;
 	protectedSkills: string[];
+	turnInterval: number;
 }
 
 const DEFAULT_SETTINGS: ReflectSettings = {
 	mode: "session",
 	protectedSkills: [],
+	turnInterval: 5,
 };
 
 function settingsPath(): string {
@@ -28,7 +30,13 @@ interface SettingsFileShape {
 	"pi-reflect"?: {
 		mode?: unknown;
 		protectedSkills?: unknown;
+		turnInterval?: unknown;
 	};
+}
+
+function parseTurnInterval(value: unknown): number {
+	if (typeof value === "number" && Number.isInteger(value) && value >= 1) return value;
+	return DEFAULT_SETTINGS.turnInterval;
 }
 
 function parseProtectedSkills(value: unknown): string[] {
@@ -55,7 +63,8 @@ export function loadSettings(): ReflectSettings {
 		}
 		const mode = isReflectMode(section.mode) ? section.mode : DEFAULT_SETTINGS.mode;
 		const protectedSkills = parseProtectedSkills(section.protectedSkills);
-		cache = { mode, protectedSkills };
+		const turnInterval = parseTurnInterval(section.turnInterval);
+		cache = { mode, protectedSkills, turnInterval };
 		return cache;
 	} catch (err) {
 		const code = (err as NodeJS.ErrnoException).code;

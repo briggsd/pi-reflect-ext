@@ -12,6 +12,7 @@ import { createSkillManageTool } from "./tools/skill-manage.ts";
 const protectedConfig: ProtectedSkillsConfig = { protectedSkills: [] };
 
 let reviewInFlight = false;
+let turnsSinceReview = 0;
 
 function refreshSettings(): void {
 	invalidateSettingsCache();
@@ -138,6 +139,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 		invalidateMemoryCache();
 		invalidateStateCache();
 		refreshSettings();
+		turnsSinceReview = 0;
 	});
 
 	pi.on("before_agent_start", (event) => {
@@ -152,8 +154,11 @@ export default function piReflect(pi: ExtensionAPI): void {
 		} catch {
 			// state recording is best-effort
 		}
-		const mode = loadSettings().mode;
+		const { mode, turnInterval } = loadSettings();
 		if (mode !== "turn") return;
+		turnsSinceReview++;
+		if (turnsSinceReview < turnInterval) return;
+		turnsSinceReview = 0;
 		setImmediate(() => {
 			void dispatchReview(pi, ctx, "turn_end", mode, false);
 		});
@@ -161,7 +166,8 @@ export default function piReflect(pi: ExtensionAPI): void {
 
 	pi.on("agent_end", (_event, ctx) => {
 		const mode = loadSettings().mode;
-		if (mode !== "session") return;
+		if (mode !== "session" && mode !== "turn") return;
+		turnsSinceReview = 0;
 		setImmediate(() => {
 			void dispatchReview(pi, ctx, "agent_end", mode, false);
 		});
