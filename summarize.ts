@@ -14,7 +14,7 @@ function isSkillManageDetails(value: unknown): value is SkillManageDetails {
 }
 
 interface PiJournalDetails {
-	date?: string;
+	ts?: string;
 	file?: string;
 	created?: boolean;
 }
