@@ -87,7 +87,7 @@ export function combinedReviewPrompt(inputs: PromptInputs): string {
 
 You have six tools. Route to the right surface — do not duplicate across surfaces:
 
-- \`pi_journal\` — append a **detailed** session log to \`~/.pi/reflect/journal/YYYY-MM-DD.md\`. **Primary session record — no vault required.** Write with full detail: specific file paths, rationale behind decisions, enough context for a future agent to resume without re-reading the conversation. Use for every substantive session.
+- \`pi_journal\` — append a session entry to \`~/.pi/reflect/journal.jsonl\`. **Primary session record — no vault required.** Write terse: fragments OK, drop articles/filler, arrows for causality (X → Y). Full technical precision, minimal prose. Exception: \`decisions\` field — keep rationale in full sentences, that\'s the most valuable thing to preserve. Include specific file paths. Use for every substantive session.
 - \`vault_daily\` — append a **summarized** session block to today's vault daily note (\`~/vault/Daily/\`). Human-facing, shorter than \`pi_journal\`. The tool skips gracefully if the vault doesn't exist. Write a concise summary: focus, key bullets, decisions, open items. Use alongside \`pi_journal\` for every substantive session.
 - \`memory\` — edit \`~/.pi/memory.md\`. Use for a **stable user preference or convention** that will shape every future session (e.g. language, tooling, style). Do not use for knowledge insights or session narratives.
 - \`skill_manage\` — manage skills under \`~/.pi/skills/\`. Use for a **reusable agent recipe** the agent worked out from scratch this session. Skills marked with " * " are protected.
