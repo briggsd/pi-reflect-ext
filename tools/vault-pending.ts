@@ -92,6 +92,18 @@ export const vaultPendingTool = defineTool({
 					return err("propose", (e as Error).message);
 				}
 
+				// Reject if any existing file already contains this slug (regardless of date prefix)
+				try {
+					const existing = fs.readdirSync(pendingDir).filter(
+						(f) => f.endsWith(`-${params.slug}.md`) && f !== filename,
+					);
+					if (existing.length > 0) {
+						return err("propose", `duplicate slug — already pending as: ${existing.join(", ")}`);
+					}
+				} catch {
+					// _pending dir doesn't exist yet — no duplicates possible
+				}
+
 				const frontmatter = [
 					"---",
 					`type: ${params.type}`,
