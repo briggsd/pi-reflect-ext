@@ -22,10 +22,13 @@ import { getSkillsRoot, resolveSkillFile } from "./safe-path.ts";
 import { type EditRecord, summarizeEdits } from "./summarize.ts";
 import { memoryTool } from "./tools/memory.ts";
 import { createSkillManageTool } from "./tools/skill-manage.ts";
+import { vaultDailyTool } from "./tools/vault-daily.ts";
+import { vaultPendingTool } from "./tools/vault-pending.ts";
+import { vaultSourceTool } from "./tools/vault-source.ts";
 
 const REVIEW_TIMEOUT_MS = 60_000;
 const MAX_TURNS = 16;
-const TRANSCRIPT_TAIL_BYTES = 24_000;
+const TRANSCRIPT_TAIL_BYTES = 48_000;
 
 export interface BackgroundReviewResult {
 	summary: string | null;
@@ -66,10 +69,10 @@ export async function runBackgroundReview(
 	const systemPrompt = ctx.getSystemPrompt();
 	const tools: AgentTool[] = [
 		toAgentTool(memoryTool, ctx),
-		toAgentTool(
-			createSkillManageTool(() => protectedConfig),
-			ctx,
-		),
+		toAgentTool(createSkillManageTool(() => protectedConfig), ctx),
+		toAgentTool(vaultPendingTool, ctx),
+		toAgentTool(vaultDailyTool, ctx),
+		toAgentTool(vaultSourceTool, ctx),
 	];
 
 	const reviewContext: AgentContext = {
@@ -109,13 +112,11 @@ export async function runBackgroundReview(
 		const stream = agentLoop([userPrompt], reviewContext, config, abortController.signal, options?.streamFn);
 		for await (const event of stream as AsyncIterable<AgentEvent>) {
 			if (event.type === "tool_execution_end" && !event.isError) {
-				if (event.toolName === "memory" || event.toolName === "skill_manage") {
-					edits.push({
-						toolCallId: event.toolCallId,
-						toolName: event.toolName,
-						details: event.result?.details,
-					});
-				}
+				edits.push({
+					toolCallId: event.toolCallId,
+					toolName: event.toolName,
+					details: event.result?.details,
+				});
 			}
 		}
 	} catch (err) {
