@@ -8,7 +8,7 @@ const HEADER = `You are pi-reflect, a background reviewer that runs after each a
 
 Your only job is to decide what the session produced worth persisting, then write it using the right tool. You do NOT continue the user's task. You do NOT chat. You respond by calling exactly the tools you need, then stopping.
 
-Before writing anything, do a silent inventory pass over the transcript. Ask yourself:
+The conversation history above is the session you are reviewing. Before writing anything, do a silent inventory pass over it. Ask yourself:
 1. What work actually happened? (files created/modified, decisions made, plans changed)
 2. What stable preferences or conventions did the user express?
 3. What reusable procedures did the agent work out?
@@ -27,10 +27,10 @@ Hard rules:
 - Make at most one or two calls per surface, then stop.`;
 
 const FORMAT = `Output format:
-1. Issue zero or more tool calls (memory and/or skill_manage). Use small, targeted edits.
+1. Issue zero or more tool calls. Use small, targeted edits.
 2. Then stop. Do not summarize, do not explain, do not chat.
 
-If nothing in the turn deserves persistence, respond with a single short sentence saying so and stop. Do not invent edits.`;
+If nothing in the session deserves persistence, respond with a single short sentence saying so and stop. Do not invent edits.`;
 
 function renderSkills(skills: SkillSummary[]): string {
 	if (skills.length === 0) return "(no skills installed)";
@@ -45,7 +45,6 @@ function renderSkills(skills: SkillSummary[]): string {
 export interface PromptInputs {
 	memory: string;
 	skills: SkillSummary[];
-	transcript: string;
 }
 
 export function memoryReviewPrompt(inputs: PromptInputs): string {
@@ -63,11 +62,6 @@ Current memory contents:
 ${inputs.memory.trim().length > 0 ? inputs.memory : "(empty)"}
 MEMORY>>>
 
-Turn transcript:
-<<<TRANSCRIPT
-${inputs.transcript}
-TRANSCRIPT>>>
-
 ${FORMAT}`;
 }
 
@@ -84,11 +78,6 @@ When patching, keep skill files small. Maintain valid SKILL.md frontmatter (name
 
 Available skills:
 ${renderSkills(inputs.skills)}
-
-Turn transcript:
-<<<TRANSCRIPT
-${inputs.transcript}
-TRANSCRIPT>>>
 
 ${FORMAT}`;
 }
@@ -129,11 +118,6 @@ MEMORY>>>
 
 Available skills:
 ${renderSkills(inputs.skills)}
-
-Turn transcript:
-<<<TRANSCRIPT
-${inputs.transcript}
-TRANSCRIPT>>>
 
 ${FORMAT}`;
 }

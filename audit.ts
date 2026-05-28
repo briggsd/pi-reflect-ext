@@ -7,7 +7,7 @@ import type { RunSummary } from "./state.ts";
 export interface AuditEntry {
 	ts: string;
 	mode: ReflectMode;
-	trigger: "turn_end" | "agent_end" | "manual" | "session";
+	trigger: "agent_end" | "manual" | "session";
 	durationMs: number;
 	summary: string | null;
 	memoryEdits: number;

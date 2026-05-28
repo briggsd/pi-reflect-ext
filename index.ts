@@ -8,11 +8,14 @@ import { invalidateSettingsCache, isReflectMode, loadSettings, overrideMode, typ
 import { formatStatus, invalidateStateCache, loadState, type RunSummary, recordRun, recordTurn } from "./state.ts";
 import { memoryTool } from "./tools/memory.ts";
 import { createSkillManageTool } from "./tools/skill-manage.ts";
+import { vaultDailyTool } from "./tools/vault-daily.ts";
+import { vaultPendingTool } from "./tools/vault-pending.ts";
+import { vaultSourceTool } from "./tools/vault-source.ts";
 
 const protectedConfig: ProtectedSkillsConfig = { protectedSkills: [] };
 
 let reviewInFlight = false;
-let turnsSinceReview = 0;
+let agentRunsSinceReview = 0;
 
 function refreshSettings(): void {
 	invalidateSettingsCache();
@@ -132,6 +135,9 @@ async function dispatchReview(
 export default function piReflect(pi: ExtensionAPI): void {
 	pi.registerTool(memoryTool);
 	pi.registerTool(createSkillManageTool(() => protectedConfig));
+	pi.registerTool(vaultPendingTool);
+	pi.registerTool(vaultDailyTool);
+	pi.registerTool(vaultSourceTool);
 
 	refreshSettings();
 
@@ -139,7 +145,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 		invalidateMemoryCache();
 		invalidateStateCache();
 		refreshSettings();
-		turnsSinceReview = 0;
+		agentRunsSinceReview = 0;
 	});
 
 	pi.on("before_agent_start", (event) => {
@@ -148,26 +154,21 @@ export default function piReflect(pi: ExtensionAPI): void {
 		return { systemPrompt: injectMemoryIntoSystemPrompt(event.systemPrompt, memory) };
 	});
 
-	pi.on("turn_end", (_event, ctx) => {
+	pi.on("turn_end", () => {
 		try {
 			recordTurn();
 		} catch {
 			// state recording is best-effort
 		}
-		const { mode, turnInterval } = loadSettings();
-		if (mode !== "turn") return;
-		turnsSinceReview++;
-		if (turnsSinceReview < turnInterval) return;
-		turnsSinceReview = 0;
-		setImmediate(() => {
-			void dispatchReview(pi, ctx, "turn_end", mode, false);
-		});
 	});
 
 	pi.on("agent_end", (_event, ctx) => {
-		const mode = loadSettings().mode;
-		if (mode !== "session" && mode !== "turn") return;
-		turnsSinceReview = 0;
+		const { mode, batchSize } = loadSettings();
+		if (mode === "off") return;
+		agentRunsSinceReview++;
+		const threshold = mode === "session" ? 1 : batchSize;
+		if (agentRunsSinceReview < threshold) return;
+		agentRunsSinceReview = 0;
 		setImmediate(() => {
 			void dispatchReview(pi, ctx, "agent_end", mode, false);
 		});
@@ -207,7 +208,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 				return filtered.length > 0 ? filtered.map((s) => ({ value: s, label: s })) : null;
 			}
 			if (tokens[0] === "mode") {
-				const modes = ["off", "session", "turn"];
+				const modes = ["off", "session", "batch"];
 				const filtered = modes.filter((m) => m.startsWith(tokens[1] ?? ""));
 				return filtered.length > 0 ? filtered.map((m) => ({ value: `mode ${m}`, label: `mode ${m}` })) : null;
 			}
@@ -237,7 +238,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 					return;
 				}
 				if (!isReflectMode(arg)) {
-					ctx.ui.notify(`pi-reflect: unknown mode "${arg}". Use off, session, or turn.`, "warning");
+					ctx.ui.notify(`pi-reflect: unknown mode "${arg}". Use off, session, or batch.`, "warning");
 					return;
 				}
 				const next = overrideMode(arg);

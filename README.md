@@ -95,8 +95,8 @@ override):
 | Mode | When the reviewer fires |
 |---|---|
 | `off` | Never. |
-| `session` | After `agent_end` — once per user-initiated agent run. **Default.** |
-| `turn` | Every `turnInterval` turns (default 5), plus after `agent_end` as a backstop. |
+| `session` | After every `agent_end` — once per message. **Default.** |
+| `batch` | Every `batchSize` agent runs (default 5). Lower cost, more signal before each review. |
 
 ## Commands
 
@@ -106,7 +106,7 @@ override):
 | `/memory show` | Render memory contents inline. |
 | `/reflect status` | Show counters, last run, mode, and protected skills. |
 | `/reflect now` | Synchronously fire a review and surface the result. |
-| `/reflect mode [off\|session\|turn]` | View or set the mode for this session. |
+| `/reflect mode [off\|session\|batch]` | View or set the mode for this session. |
 
 ## Tools the reviewer can call
 
@@ -153,7 +153,7 @@ Protected skills cannot be overwritten. See "Protecting skills" below.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `mode` | `"off"` \| `"session"` \| `"turn"` | `"session"` | Reviewer trigger. |
-| `turnInterval` | `number` | `5` | In `turn` mode, how many turns to accumulate before firing a review. Must be a positive integer. |
+| `batchSize` | `number` | `5` | In `batch` mode, how many agent runs to accumulate before firing a review. Must be a positive integer. |
 | `protectedSkills` | `string[]` | `[]` | Skill names the reviewer (and any agent) cannot overwrite. |
 
 Settings are read at every `session_start`. Edit the file and restart pi to

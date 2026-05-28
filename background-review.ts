@@ -8,7 +8,6 @@ import type {
 	StreamFn,
 } from "@earendil-works/pi-agent-core";
 import { agentLoop } from "@earendil-works/pi-agent-core";
-import type { Message } from "@earendil-works/pi-ai";
 import {
 	convertToLlm,
 	type ExtensionAPI,
@@ -28,7 +27,6 @@ import { vaultSourceTool } from "./tools/vault-source.ts";
 
 const REVIEW_TIMEOUT_MS = 60_000;
 const MAX_TURNS = 16;
-const TRANSCRIPT_TAIL_BYTES = 48_000;
 
 export interface BackgroundReviewResult {
 	summary: string | null;
@@ -61,10 +59,9 @@ export async function runBackgroundReview(
 	const messagesSnapshot = captureMessages(ctx);
 	if (messagesSnapshot.length === 0) return { ...empty, skipped: "no_messages" };
 
-	const transcript = renderTranscript(messagesSnapshot);
 	const memoryText = safeLoadMemory();
 	const skills = listSkillSummaries(protectedConfig);
-	const promptText = combinedReviewPrompt({ memory: memoryText, skills, transcript });
+	const promptText = combinedReviewPrompt({ memory: memoryText, skills });
 
 	const systemPrompt = ctx.getSystemPrompt();
 	const tools: AgentTool[] = [
@@ -77,7 +74,7 @@ export async function runBackgroundReview(
 
 	const reviewContext: AgentContext = {
 		systemPrompt,
-		messages: [],
+		messages: messagesSnapshot,
 		tools,
 	};
 
@@ -151,57 +148,6 @@ function captureMessages(ctx: ExtensionContext): AgentMessage[] {
 	return out;
 }
 
-function renderTranscript(messages: AgentMessage[]): string {
-	const llmMessages = convertToLlm(messages);
-	const lines: string[] = [];
-	for (const m of llmMessages) {
-		lines.push(formatMessage(m));
-	}
-	const joined = lines.join("\n\n");
-	if (joined.length <= TRANSCRIPT_TAIL_BYTES) return joined;
-	const tail = joined.slice(joined.length - TRANSCRIPT_TAIL_BYTES);
-	return `[...transcript truncated; showing tail ${TRANSCRIPT_TAIL_BYTES} bytes...]\n${tail}`;
-}
-
-function formatMessage(m: Message): string {
-	switch (m.role) {
-		case "user": {
-			const text = typeof m.content === "string" ? m.content : extractText(m.content);
-			return `[user]\n${text}`;
-		}
-		case "assistant": {
-			const parts: string[] = [];
-			for (const block of m.content) {
-				if (block.type === "text") parts.push(block.text);
-				else if (block.type === "toolCall") {
-					parts.push(
-						`<tool_call name="${block.name}" id="${block.id}">${safeStringify(block.arguments)}</tool_call>`,
-					);
-				}
-			}
-			return `[assistant]\n${parts.join("\n")}`;
-		}
-		case "toolResult": {
-			const text = extractText(m.content);
-			return `[tool_result name="${m.toolName}"${m.isError ? " error=true" : ""}]\n${text}`;
-		}
-	}
-}
-
-function extractText(content: { type: string; text?: string }[]): string {
-	return content
-		.map((c) => (c.type === "text" && typeof c.text === "string" ? c.text : ""))
-		.filter((s) => s.length > 0)
-		.join("\n");
-}
-
-function safeStringify(value: unknown): string {
-	try {
-		return JSON.stringify(value);
-	} catch {
-		return String(value);
-	}
-}
 
 function safeLoadMemory(): string {
 	try {

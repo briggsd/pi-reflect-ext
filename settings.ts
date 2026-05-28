@@ -2,9 +2,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getReflectHome } from "./safe-path.ts";
 
-export type ReflectMode = "off" | "session" | "turn";
+export type ReflectMode = "off" | "session" | "batch";
 
-const MODES: ReadonlyArray<ReflectMode> = ["off", "session", "turn"];
+const MODES: ReadonlyArray<ReflectMode> = ["off", "session", "batch"];
 
 export function isReflectMode(value: unknown): value is ReflectMode {
 	return typeof value === "string" && (MODES as readonly string[]).includes(value);
@@ -13,13 +13,15 @@ export function isReflectMode(value: unknown): value is ReflectMode {
 export interface ReflectSettings {
 	mode: ReflectMode;
 	protectedSkills: string[];
-	turnInterval: number;
+	batchSize: number;
+	vaultPath: string;
 }
 
 const DEFAULT_SETTINGS: ReflectSettings = {
 	mode: "session",
 	protectedSkills: [],
-	turnInterval: 5,
+	batchSize: 5,
+	vaultPath: "",
 };
 
 function settingsPath(): string {
@@ -30,13 +32,14 @@ interface SettingsFileShape {
 	"pi-reflect"?: {
 		mode?: unknown;
 		protectedSkills?: unknown;
-		turnInterval?: unknown;
+		batchSize?: unknown;
+		vaultPath?: unknown;
 	};
 }
 
-function parseTurnInterval(value: unknown): number {
+function parseBatchSize(value: unknown): number {
 	if (typeof value === "number" && Number.isInteger(value) && value >= 1) return value;
-	return DEFAULT_SETTINGS.turnInterval;
+	return DEFAULT_SETTINGS.batchSize;
 }
 
 function parseProtectedSkills(value: unknown): string[] {
@@ -63,8 +66,9 @@ export function loadSettings(): ReflectSettings {
 		}
 		const mode = isReflectMode(section.mode) ? section.mode : DEFAULT_SETTINGS.mode;
 		const protectedSkills = parseProtectedSkills(section.protectedSkills);
-		const turnInterval = parseTurnInterval(section.turnInterval);
-		cache = { mode, protectedSkills, turnInterval };
+		const batchSize = parseBatchSize(section.batchSize);
+		const vaultPath = typeof section.vaultPath === "string" ? section.vaultPath : DEFAULT_SETTINGS.vaultPath;
+		cache = { mode, protectedSkills, batchSize, vaultPath };
 		return cache;
 	} catch (err) {
 		const code = (err as NodeJS.ErrnoException).code;
