@@ -10,7 +10,6 @@ import type {
 import { agentLoop } from "@earendil-works/pi-agent-core";
 import {
 	convertToLlm,
-	type ExtensionAPI,
 	type ExtensionContext,
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -42,7 +41,6 @@ export interface RunBackgroundReviewOptions {
 }
 
 export async function runBackgroundReview(
-	_pi: ExtensionAPI,
 	ctx: ExtensionContext,
 	protectedConfig: ProtectedSkillsConfig,
 	options?: RunBackgroundReviewOptions,

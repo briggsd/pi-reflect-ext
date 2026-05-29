@@ -18,6 +18,29 @@ const protectedConfig: ProtectedSkillsConfig = { protectedSkills: [] };
 let reviewInFlight = false;
 let agentRunsSinceReview = 0;
 
+// Session-replacement guard for the deferred `agent_end` review.
+//
+// On `agent_end` we schedule `dispatchReview` via `setImmediate` so it runs
+// off the agent-loop tick. If the user starts/forks/switches a session in
+// that window, pi emits `session_shutdown` and the captured `ctx` (and `pi`)
+// become stale — any property access on them throws the
+// "extension ctx is stale after session replacement or reload" error,
+// which propagates as an uncaughtException and exits pi.
+//
+// We set `sessionShuttingDown = true` on `session_shutdown` and bail out of
+// the deferred review (and the top of `dispatchReview`) before touching ctx.
+// `safeNotify` is the belt-and-suspenders backstop for the in-flight window
+// where the review has already started but ctx goes stale mid-await.
+let sessionShuttingDown = false;
+
+function safeNotify(ctx: ExtensionContext, message: string, level: "info" | "warning"): void {
+	try {
+		ctx.ui.notify(message, level);
+	} catch {
+		// ctx may be stale after session replacement; drop the notification.
+	}
+}
+
 function refreshSettings(): void {
 	invalidateSettingsCache();
 	const settings = loadSettings();
@@ -70,7 +93,6 @@ function recordSkippedRun(reason: "in_flight", trigger: AuditEntry["trigger"], m
 }
 
 async function dispatchReview(
-	pi: ExtensionAPI,
 	ctx: ExtensionContext,
 	trigger: AuditEntry["trigger"],
 	mode: ReflectMode,
@@ -78,13 +100,16 @@ async function dispatchReview(
 ): Promise<void> {
 	if (reviewInFlight) {
 		recordSkippedRun("in_flight", trigger, mode);
-		if (notifyEmpty) ctx.ui.notify("pi-reflect: review already in flight, skipping.", "warning");
+		if (notifyEmpty) safeNotify(ctx, "pi-reflect: review already in flight, skipping.", "warning");
+		return;
+	}
+	if (sessionShuttingDown) {
 		return;
 	}
 	reviewInFlight = true;
 	const startedAt = Date.now();
 	try {
-		const result = await runBackgroundReview(pi, ctx, protectedConfig);
+		const result = await runBackgroundReview(ctx, protectedConfig);
 		const run = toRunSummary(result, startedAt, Date.now());
 		try {
 			recordRun(run);
@@ -97,14 +122,14 @@ async function dispatchReview(
 			// best-effort
 		}
 		if (result.skipped) {
-			if (notifyEmpty) ctx.ui.notify(`pi-reflect: skipped (${result.skipped}).`, "info");
+			if (notifyEmpty) safeNotify(ctx, `pi-reflect: skipped (${result.skipped}).`, "info");
 		} else if (result.summary) {
-			ctx.ui.notify(`pi-reflect: ${result.summary}`, "info");
+			safeNotify(ctx, `pi-reflect: ${result.summary}`, "info");
 		} else if (notifyEmpty) {
-			ctx.ui.notify("pi-reflect: no edits.", "info");
+			safeNotify(ctx, "pi-reflect: no edits.", "info");
 		}
 		if (result.errorMessage) {
-			ctx.ui.notify(`pi-reflect review error: ${result.errorMessage}`, "warning");
+			safeNotify(ctx, `pi-reflect review error: ${result.errorMessage}`, "warning");
 		}
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : String(err);
@@ -127,7 +152,7 @@ async function dispatchReview(
 		} catch {
 			// best-effort
 		}
-		ctx.ui.notify(`pi-reflect review crashed: ${message}`, "warning");
+		safeNotify(ctx, `pi-reflect review crashed: ${message}`, "warning");
 	} finally {
 		reviewInFlight = false;
 	}
@@ -148,6 +173,11 @@ export default function piReflect(pi: ExtensionAPI): void {
 		invalidateStateCache();
 		refreshSettings();
 		agentRunsSinceReview = 0;
+		sessionShuttingDown = false;
+	});
+
+	pi.on("session_shutdown", () => {
+		sessionShuttingDown = true;
 	});
 
 	pi.on("before_agent_start", (event) => {
@@ -172,7 +202,8 @@ export default function piReflect(pi: ExtensionAPI): void {
 		if (agentRunsSinceReview < threshold) return;
 		agentRunsSinceReview = 0;
 		setImmediate(() => {
-			void dispatchReview(pi, ctx, "agent_end", mode, false);
+			if (sessionShuttingDown) return;
+			void dispatchReview(ctx, "agent_end", mode, false);
 		});
 	});
 
@@ -230,7 +261,7 @@ export default function piReflect(pi: ExtensionAPI): void {
 				return;
 			}
 			if (trimmed === "now") {
-				await dispatchReview(pi, ctx, "manual", loadSettings().mode, true);
+				await dispatchReview(ctx, "manual", loadSettings().mode, true);
 				return;
 			}
 			if (trimmed.startsWith("mode")) {
