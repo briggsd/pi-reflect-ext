@@ -1,3 +1,4 @@
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -28,17 +29,39 @@ function sleepSyncMs(ms: number): void {
 	Atomics.wait(buf, 0, 0, ms);
 }
 
-function writeLockFile(lockPath: string): number {
+interface AcquiredLock {
+	fd: number;
+	token: string;
+}
+
+function writeLockFile(lockPath: string): AcquiredLock {
 	// 'wx' = O_CREAT | O_EXCL | O_WRONLY. Atomic create-or-fail across processes
 	// on every POSIX filesystem we care about (and on NTFS via Node's wrapper).
 	const fd = fs.openSync(lockPath, "wx");
+	const token = crypto.randomBytes(8).toString("hex");
+	// Body MUST be written successfully: stale-steal liveness checks read the pid
+	// from it, and the release path reads the token to confirm we still own this
+	// lockfile before unlinking (so we don't accidentally unlink a lock that was
+	// stolen from us during a long critical section). If writeSync fails we drop
+	// the lock atomically and let the caller retry / surface the error.
 	try {
-		fs.writeSync(fd, `${process.pid}\n${Date.now()}\n`);
-	} catch {
-		// Body write is best-effort metadata only. The lock is held by the file's
-		// existence, not its contents.
+		fs.writeSync(fd, `${process.pid}\n${Date.now()}\n${token}\n`);
+	} catch (err) {
+		try { fs.closeSync(fd); } catch { /* ignore */ }
+		try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
+		throw err;
 	}
-	return fd;
+	return { fd, token };
+}
+
+function readLockToken(lockPath: string): string | null {
+	try {
+		const body = fs.readFileSync(lockPath, "utf-8");
+		const parts = body.split("\n");
+		return parts[2] ?? null;
+	} catch {
+		return null;
+	}
 }
 
 function processAlive(pid: number): boolean {
@@ -102,12 +125,12 @@ export function withFileLockSync<T>(target: string, fn: () => T, options?: LockO
 	fs.mkdirSync(path.dirname(lockPath), { recursive: true });
 
 	const deadline = Date.now() + timeoutMs;
-	let fd: number | null = null;
+	let acquired: AcquiredLock | null = null;
 	let attempt = 0;
 
-	while (fd === null) {
+	while (acquired === null) {
 		try {
-			fd = writeLockFile(lockPath);
+			acquired = writeLockFile(lockPath);
 		} catch (err) {
 			const code = (err as NodeJS.ErrnoException).code;
 			if (code !== "EEXIST") throw err;
@@ -130,15 +153,22 @@ export function withFileLockSync<T>(target: string, fn: () => T, options?: LockO
 		return fn();
 	} finally {
 		try {
-			fs.closeSync(fd);
+			fs.closeSync(acquired.fd);
 		} catch {
 			// ignore
 		}
-		try {
-			fs.unlinkSync(lockPath);
-		} catch {
-			// May have been stolen by another process after a stale-timeout; that's
-			// fine — they now own the lock and will release it themselves.
+		// Only unlink if the lockfile still carries OUR token. If another process
+		// stale-stole the lock and replaced it with their own, the token won't
+		// match — unlinking would drop THEIR lock and let a third process enter
+		// the critical section concurrently with them.
+		const currentToken = readLockToken(lockPath);
+		if (currentToken === acquired.token) {
+			try {
+				fs.unlinkSync(lockPath);
+			} catch {
+				// Vanished between read and unlink — fine.
+			}
 		}
+		// else: token mismatch (stolen) or unreadable — leave the file alone.
 	}
 }

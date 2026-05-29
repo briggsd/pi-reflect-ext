@@ -141,6 +141,18 @@ placeholder command. Verified `npm run check` and TUI boot.
   system-prompt injection at session start. Caches are still loaded at
   session start as before; the lock ensures the *write* path can't
   produce a lost update.
+- Release is **token-verified**: each lock acquisition writes a random
+  16-hex-char token into the lockfile body; on release we only `unlink`
+  if the file still carries our token. Closes the otherwise-theoretical
+  race where (a) `writeSync` of the body fails, (b) the lock is held
+  past the stale-steal threshold (30 s), (c) another process steals and
+  writes a fresh lock, and (d) our `finally` runs and would have
+  silently unlinked the new owner's lockfile.
+- Reader-drift residual: long-running pi sessions still observe memory
+  as of their last `session_start`, even if a sibling session updates
+  memory.md mid-life. The lock prevents *lost writes*; making readers
+  strongly consistent across sessions would defeat the cache that
+  keeps the system prompt stable for Anthropic prompt-cache hits.
 
 ### M7 — End-to-end acceptance
 
