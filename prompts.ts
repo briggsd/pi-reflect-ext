@@ -19,7 +19,8 @@ The conversation history above is the session you are reviewing. Before writing 
 Then route each finding to the right surface. The inventory is the work — the tool calls are just the output.
 
 Hard rules:
-- Be conservative on memory and skills. Most sessions produce nothing for those surfaces.
+- Be conservative on memory. Most sessions produce nothing for that surface.
+- Be active on skills. Most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
 - Be generous on pi_journal and vault_daily: if any real work happened, log it. Write pi_journal with full detail; vault_daily as a shorter human-facing summary.
 - Be generous on vault_pending (lead): if a good idea or thread came up but wasn't pursued, park it. These are easy to lose and valuable to recover.
 - Persist only facts that will still be useful 30 days from now.
@@ -70,11 +71,25 @@ export function skillReviewPrompt(inputs: PromptInputs): string {
 
 You only have the \`skill_manage\` tool. Use it to maintain skills under \`~/.pi/skills/\`. Skills marked with " * " are protected and cannot be overwritten.
 
-Skill triggers (record only if at least one applies):
-- A reusable procedure or recipe the agent worked out from scratch this turn that will be needed again.
-- A correction to an existing skill where the current text led the agent astray.
+Be active — most sessions produce at least one skill update, even if small.
 
-When patching, keep skill files small. Maintain valid SKILL.md frontmatter (name + description).
+Signals that warrant action (any one qualifies):
+- The user corrected the agent's style, tone, format, verbosity, or approach. Frustration signals ("stop doing X", "too verbose", "don't format like this", "I hate when you Y") are first-class skill signals — embed the fix in the skill governing that task so the next session starts already knowing.
+- The agent worked out a non-trivial technique, fix, workaround, or debugging path that a future session would benefit from.
+- A skill was loaded or consulted this session and turned out wrong, missing a step, or outdated — patch it now.
+
+Preference order — pick the earliest that fits:
+1. Patch a skill already loaded or consulted this session (it was in play; it's the right one to update).
+2. Patch an existing skill whose scope covers the learning.
+3. Add a \`references/\` support file to an existing skill via \`action=write_file\` with \`file_path="references/<topic>.md"\` — for session-specific detail, error notes, or condensed knowledge.
+4. Create a new class-level skill only when nothing existing fits. Name at the class level — NOT a specific error string, PR number, or "fix-X-today" artifact.
+
+Do NOT capture:
+- Environment-dependent failures (missing binaries, unconfigured creds) — these change and must not become permanent rules.
+- Negative capability claims ("X tool doesn't work") — these harden into refusals that outlive the actual problem.
+- One-off task narratives with no recurring class.
+
+"Nothing to update" is a real option but not the default. If the session ran smoothly with no corrections and no new technique, say so and stop. Otherwise, act.
 
 Available skills:
 ${renderSkills(inputs.skills)}
@@ -90,7 +105,7 @@ You have six tools. Route to the right surface — do not duplicate across surfa
 - \`pi_journal\` — append a session entry to \`~/.pi/reflect/journal.jsonl\`. **Primary session record — no vault required.** Write terse: fragments OK, drop articles/filler, arrows for causality (X → Y). Full technical precision, minimal prose. Exception: \`decisions\` field — keep rationale in full sentences, that\'s the most valuable thing to preserve. Include specific file paths. Use for every substantive session.
 - \`vault_daily\` — append a **summarized** session block to today's vault daily note (\`~/vault/Daily/\`). Human-facing, shorter than \`pi_journal\`. The tool skips gracefully if the vault doesn't exist. Write a concise summary: focus, key bullets, decisions, open items. Use alongside \`pi_journal\` for every substantive session.
 - \`memory\` — edit \`~/.pi/memory.md\`. Use for a **stable user preference or convention** that will shape every future session (e.g. language, tooling, style). Do not use for knowledge insights or session narratives.
-- \`skill_manage\` — manage skills under \`~/.pi/skills/\`. Use for a **reusable agent recipe** the agent worked out from scratch this session. Skills marked with " * " are protected.
+- \`skill_manage\` — manage skills under \`~/.pi/skills/\`. Be **active** — most sessions produce at least one skill update. Signals that warrant action (any one qualifies): the user corrected the agent's style, tone, format, verbosity, or approach (frustration signals like "stop doing X", "too verbose", "don't format like this" are **first-class skill signals** — embed the fix in the skill governing that task so the next session starts already knowing); the agent worked out a non-trivial technique, fix, or workaround; a skill was consulted this session and turned out wrong or incomplete — patch it now. Prefer this update order: (1) patch a skill already loaded/consulted this session, (2) patch an existing skill whose scope covers the learning, (3) add a \`references/<topic>.md\` support file to an existing skill via \`action=write_file\`, (4) create a new class-level skill only when nothing existing fits. Do NOT capture: environment-dependent failures; negative capability claims ("X doesn't work" — these harden into permanent refusals); one-off task narratives. "Nothing to update" is real but not the default. Skills marked with " * " are protected.
 - \`vault_pending\` — propose an item to \`~/vault/_pending/\` for the user to route into the knowledge graph. Use for: a knowledge insight that enriches a vault topic (type: semantic), a research question or good idea that came up but wasn't pursued this session (type: lead), or a specific external source to run through content-synthesis (type: source). **Lead is the most important type to be generous with** — ideas mentioned in passing and set aside are exactly what gets lost between sessions. **Before proposing anything, call \`vault_pending\` with \`action=list\` first** — do not re-propose items already pending or substantially the same idea under a different slug.
 - \`vault_source\` — append directly to \`Intelligence/sources-to-capture.md\`. Use only for clear, unambiguous source references (a URL, a book title, a paper) that don't need human routing — low-risk additive write.
 
@@ -98,7 +113,9 @@ Surface selection guide:
 | What the session produced | Tool |
 |---|---|
 | Stable user preference / convention | memory |
-| Reusable agent recipe | skill_manage |
+| Reusable technique or agent recipe | skill_manage |
+| User correction to agent style or approach | skill_manage |
+| Skill consulted this session that was wrong/incomplete | skill_manage (patch it) |
 | Substantive work (detailed, agent-recall) | pi_journal |
 | Substantive work (summary, human-facing) | vault_daily |
 | Knowledge insight for a vault topic | vault_pending (semantic) |
