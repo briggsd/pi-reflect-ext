@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { atomicWriteFile } from "../atomic-write.ts";
+import { withFileLockSync } from "../file-lock.ts";
 import { confinePathTo } from "../safe-path.ts";
 import { getVaultDailyDir, getVaultRoot } from "../vault-paths.ts";
 
@@ -149,39 +150,43 @@ export const vaultDailyTool = defineTool({
 			};
 		}
 
-		let current = "";
-		let created = false;
-		try {
-			current = fs.readFileSync(target, "utf-8");
-		} catch (e) {
-			const code = (e as NodeJS.ErrnoException).code;
-			if (code === "ENOENT") {
-				current = scaffoldDailyNote(dateStr);
-				created = true;
-			} else {
-				return {
-					content: [{ type: "text", text: `vault_daily: read error: ${(e as Error).message}` }],
-					details: { date: dateStr, created: false, bytesBefore: 0, bytesAfter: 0 } as VaultDailyDetails,
-					isError: true as const,
-				};
+		// Lock the RMW — two pi sessions wrapping simultaneously on the same Daily
+		// note would otherwise lost-update one of their session blocks.
+		return withFileLockSync(target, () => {
+			let current = "";
+			let created = false;
+			try {
+				current = fs.readFileSync(target, "utf-8");
+			} catch (e) {
+				const code = (e as NodeJS.ErrnoException).code;
+				if (code === "ENOENT") {
+					current = scaffoldDailyNote(dateStr);
+					created = true;
+				} else {
+					return {
+						content: [{ type: "text", text: `vault_daily: read error: ${(e as Error).message}` }],
+						details: { date: dateStr, created: false, bytesBefore: 0, bytesAfter: 0 } as VaultDailyDetails,
+						isError: true as const,
+					};
+				}
 			}
-		}
 
-		const bytesBefore = current.length;
-		const block = formatSessionBlock(params);
-		const sep = current.endsWith("\n") ? "" : "\n";
-		const next = `${current}${sep}${block}`;
+			const bytesBefore = current.length;
+			const block = formatSessionBlock(params);
+			const sep = current.endsWith("\n") ? "" : "\n";
+			const next = `${current}${sep}${block}`;
 
-		atomicWriteFile(target, next);
+			atomicWriteFile(target, next);
 
-		return {
-			content: [
-				{
-					type: "text",
-					text: `vault_daily: appended session to ${dateStr}.md${created ? " (created)" : ""}`,
-				},
-			],
-			details: { date: dateStr, created, bytesBefore, bytesAfter: next.length } as VaultDailyDetails,
-		};
+			return {
+				content: [
+					{
+						type: "text",
+						text: `vault_daily: appended session to ${dateStr}.md${created ? " (created)" : ""}`,
+					},
+				],
+				details: { date: dateStr, created, bytesBefore, bytesAfter: next.length } as VaultDailyDetails,
+			};
+		});
 	},
 });

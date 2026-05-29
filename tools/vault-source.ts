@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { atomicWriteFile } from "../atomic-write.ts";
+import { withFileLockSync } from "../file-lock.ts";
 import { getVaultSourcesFile } from "../vault-paths.ts";
 
 const VaultSourceParams = Type.Object({
@@ -32,6 +33,7 @@ export const vaultSourceTool = defineTool({
 	async execute(_toolCallId, params) {
 		const target = getVaultSourcesFile();
 
+		return withFileLockSync(target, () => {
 		let current = "";
 		try {
 			current = fs.readFileSync(target, "utf-8");
@@ -75,5 +77,6 @@ export const vaultSourceTool = defineTool({
 			content: [{ type: "text", text: `vault_source: queued "${preview}"` }],
 			details: { entry: trimmed, bytesBefore, bytesAfter: next.length } as VaultSourceDetails,
 		};
+		});
 	},
 });
