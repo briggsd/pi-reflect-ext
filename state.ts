@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import { atomicWriteFile } from "./atomic-write.ts";
+import { withFileLockSync } from "./file-lock.ts";
 import { getReflectStateDir, getStatePath } from "./safe-path.ts";
 
 export type SkipReason = "no_model" | "no_api_key" | "no_messages" | "in_flight" | "aborted";
@@ -97,6 +98,18 @@ export function invalidateStateCache(): void {
 	cache = null;
 }
 
+/**
+ * Run an RMW on state.json under a cross-process file lock with the in-process
+ * cache invalidated up front. Mirrors withMemoryLock — see memory.ts for the
+ * rationale on why cache invalidation must happen inside the critical section.
+ */
+export function withStateLock<T>(fn: () => T): T {
+	return withFileLockSync(getStatePath(), () => {
+		cache = null;
+		return fn();
+	});
+}
+
 export interface RunSummary {
 	startedAt: number;
 	endedAt: number;
@@ -109,13 +122,16 @@ export interface RunSummary {
 }
 
 export function recordTurn(): ReflectState {
-	const state = loadState();
-	const next: ReflectState = { ...state, turns: state.turns + 1 };
-	writeState(next);
-	return next;
+	return withStateLock(() => {
+		const state = loadState();
+		const next: ReflectState = { ...state, turns: state.turns + 1 };
+		writeState(next);
+		return next;
+	});
 }
 
 export function recordRun(run: RunSummary): ReflectState {
+	return withStateLock(() => {
 	const state = loadState();
 	const reviewsSkipped: SkippedCounts = { ...state.reviewsSkipped };
 	if (run.skipped) {
@@ -141,6 +157,7 @@ export function recordRun(run: RunSummary): ReflectState {
 	};
 	writeState(next);
 	return next;
+	});
 }
 
 export function formatStatus(state: ReflectState): string {

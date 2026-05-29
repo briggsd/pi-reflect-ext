@@ -115,6 +115,33 @@ placeholder command. Verified `npm run check` and TUI boot.
   `crypto.randomBytes` suffixes — sub-millisecond concurrent writes no
   longer collide.
 
+### M8 — Cross-process concurrency safety
+
+- New `file-lock.ts`: `withFileLockSync(target, fn)` — O_EXCL lockfile
+  primitive, no new deps. Stale-lock detection via mtime + pid liveness
+  check; sync API uses `Atomics.wait` on a `SharedArrayBuffer` so the
+  thread blocks cleanly during the (rare) contention window.
+- All read-modify-write paths on shared files now hold a lock for the
+  critical section, with in-process caches invalidated **inside** the
+  lock so a stale cache can't clobber another session's write:
+  - `memory.ts`: new `withMemoryLock(fn)`; `tools/memory.ts` wraps its
+    load→mutate→write under it. The `/memory` slash command uses
+    optimistic concurrency — if the file changed on disk while the
+    editor was open, the save is refused and the user is notified
+    instead of silently clobbering.
+  - `state.ts`: new `withStateLock(fn)`; `recordTurn` / `recordRun` use it.
+  - `tools/vault-daily.ts` and `tools/vault-source.ts`: RMW wrapped.
+  - `tools/pi-journal.ts` and `audit.ts`: JSONL appends wrapped
+    (defense in depth — entries can exceed PIPE_BUF, beyond which
+    `appendFileSync` atomicity is not guaranteed by POSIX).
+- Fixes the lost-update race documented in the 2026-05-28 concurrency
+  audit: two pi sessions both editing memory.md (or vault Daily, or
+  state.json) would previously have one session silently clobber the
+  other on its next write due to per-process `cachedMemory` +
+  system-prompt injection at session start. Caches are still loaded at
+  session start as before; the lock ensures the *write* path can't
+  produce a lost update.
+
 ### M7 — End-to-end acceptance
 
 Six scenarios covered by an offline acceptance harness driving

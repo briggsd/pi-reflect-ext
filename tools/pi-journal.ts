@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { withFileLockSync } from "../file-lock.ts";
 
 function getJournalFile(): string {
 	return path.join(os.homedir(), ".pi", "reflect", "journal.jsonl");
@@ -67,7 +68,12 @@ export const piJournalTool = defineTool({
 		});
 
 		try {
-			fs.appendFileSync(journalFile, entry + "\n", "utf-8");
+			// Lock the append: typical entries exceed PIPE_BUF (4096 B) so concurrent
+			// appendFileSync calls from sibling pi sessions can interleave and produce
+			// corrupt JSONL lines that break every future journal read.
+			withFileLockSync(journalFile, () => {
+				fs.appendFileSync(journalFile, entry + "\n", "utf-8");
+			});
 		} catch (e) {
 			return {
 				content: [{ type: "text", text: `pi_journal: write error: ${(e as Error).message}` }],

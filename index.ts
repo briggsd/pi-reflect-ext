@@ -2,7 +2,13 @@ import { type ExtensionAPI, type ExtensionContext, getMarkdownTheme } from "@ear
 import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 import { type AuditEntry, appendAudit } from "./audit.ts";
 import { type BackgroundReviewResult, runBackgroundReview } from "./background-review.ts";
-import { injectMemoryIntoSystemPrompt, invalidateMemoryCache, loadMemory, writeMemory } from "./memory.ts";
+import {
+	injectMemoryIntoSystemPrompt,
+	invalidateMemoryCache,
+	loadMemory,
+	withMemoryLock,
+	writeMemory,
+} from "./memory.ts";
 import type { ProtectedSkillsConfig } from "./protected.ts";
 import { invalidateSettingsCache, isReflectMode, loadSettings, overrideMode, type ReflectMode } from "./settings.ts";
 import { formatStatus, invalidateStateCache, loadState, type RunSummary, recordRun, recordTurn } from "./state.ts";
@@ -318,7 +324,25 @@ export default function piReflect(pi: ExtensionAPI): void {
 				ctx.ui.notify("Memory unchanged.", "info");
 				return;
 			}
-			writeMemory(edited);
+			// Optimistic concurrency: another pi session may have written to memory.md
+			// while the user had the editor open. Re-read under lock and refuse to
+			// clobber a divergent change.
+			let conflict = false;
+			withMemoryLock(() => {
+				const fresh = loadMemory();
+				if (fresh !== current) {
+					conflict = true;
+					return;
+				}
+				writeMemory(edited);
+			});
+			if (conflict) {
+				ctx.ui.notify(
+					"Memory changed on disk while editor was open. Your edit was NOT saved \u2014 reopen /memory and re-apply.",
+					"warning",
+				);
+				return;
+			}
 			ctx.ui.notify(`Memory saved (${edited.length} chars).`, "info");
 		},
 	});

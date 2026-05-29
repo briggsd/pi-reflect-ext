@@ -1,7 +1,7 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { loadMemory, writeMemory } from "../memory.ts";
+import { loadMemory, withMemoryLock, writeMemory } from "../memory.ts";
 
 const MemoryToolParams = Type.Object({
 	action: StringEnum(["add", "replace", "remove"] as const, {
@@ -51,6 +51,7 @@ export const memoryTool = defineTool({
 		"Edit the agent's persistent user memory at ~/.pi/memory.md. Use to record durable facts about the user, their preferences, and recurring conventions. Do not record transient task narratives.",
 	parameters: MemoryToolParams,
 	async execute(_toolCallId, params) {
+		return withMemoryLock(() => {
 		const current = loadMemory();
 		let next: string;
 		switch (params.action) {
@@ -117,5 +118,6 @@ export const memoryTool = defineTool({
 			content: [{ type: "text", text: `memory: ${params.action} ok (${current.length} -> ${next.length} bytes)` }],
 			details,
 		};
+		});
 	},
 });
