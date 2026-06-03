@@ -4,13 +4,15 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { atomicWriteFile } from "../atomic-write.ts";
 import { withFileLockSync } from "../file-lock.ts";
+import { localDateStr } from "../lib/dates.ts";
 import { confinePathTo } from "../safe-path.ts";
 import { getVaultDailyDir, getVaultRoot } from "../vault-paths.ts";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+// Local-date, not UTC. See ../lib/dates.ts for the why.
 function todayDateStr(): string {
-	return new Date().toISOString().slice(0, 10);
+	return localDateStr();
 }
 
 function todayTimeStr(): string {

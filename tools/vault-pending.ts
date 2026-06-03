@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { localDateStr } from "../lib/dates.ts";
 import { confinePathTo } from "../safe-path.ts";
 import { getVaultPendingDir } from "../vault-paths.ts";
 
@@ -17,8 +18,9 @@ function validateSlug(slug: string): void {
 	}
 }
 
+// Local-date, not UTC. See ../lib/dates.ts for the why.
 function todayIso(): string {
-	return new Date().toISOString().slice(0, 10);
+	return localDateStr();
 }
 
 const VaultPendingParams = Type.Object({
