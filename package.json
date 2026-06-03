@@ -2,7 +2,7 @@
 	"name": "pi-reflect",
 	"description": "Self-improvement reviewer extension for pi: persists user preferences and reusable skills after each turn or agent run.",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"scripts": {
 		"clean": "echo 'nothing to clean'",
